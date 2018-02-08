@@ -1,0 +1,7 @@
+version: '3.5'
+services:
+  dev:
+    build: .
+    volumes:
+      - ../:/go/src/github.com/friends-of-scalability/url-shortener/
+    working_dir: /go/src/github.com/friends-of-scalability/url-shortener
