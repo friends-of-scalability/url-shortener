@@ -178,4 +178,9 @@ fmt:
 	@echo "GO FMT..."
 	@gofmt -w -s $(GOFMT_FILES)
 
-.PHONY: tools default docker buildonly
+clean:
+	rm -rf bin/
+	${SCRIPT_PATH}/bin/minikube stop
+	${SCRIPT_PATH}/bin/minikube delete
+
+.PHONY: tools default docker buildonly clean

@@ -5,5 +5,5 @@ export AWS_DEFAULT_REGION=eu-west-1
 SCRIPT_DIR="$( cd "$( dirname "$0" )" && pwd )"
 
 pushd docker
-docker-compose run dev $@
+docker-compose run -u ${UID} dev $@
 popd
