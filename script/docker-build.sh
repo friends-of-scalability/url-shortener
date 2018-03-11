@@ -7,5 +7,5 @@ SCRIPT_DIR="$( cd "$( dirname "$0" )" && pwd )"
 
 pushd infra/local/docker
 docker-compose build
-docker-compose run -u ${UID} dev $@
+docker-compose run -u $(id -u) dev $@
 popd

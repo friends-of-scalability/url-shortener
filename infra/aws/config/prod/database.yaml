@@ -4,10 +4,11 @@ parameters:
   DBName: urlshortener
   DBAllocatedStorage: "20"
   DBInstanceClass: "db.t2.micro"
-  DBUser: urlshortener
+  DBUser: {{ var.ssmdbuser }}
   DBPassword: {{ var.ssmdbpassword }}
   VPC: {{ var.vpc}}
   Subnet0: {{ var.subnet0 }}
   Subnet1: {{ var.subnet1 }}
   Subnet2: {{ var.subnet2 }}
   InstanceSecurityGroup: !stack_output webservers::WebServerSecurityGroup
+  StudentId: {{ var.studentId }}

@@ -13,4 +13,4 @@ data:
   URLSHORTENER_POSTGRESQL_USER: {{ .Values.postgresql.postgresUser | quote}}
   URLSHORTENER_STORAGE: postgres
   URLSHORTENER_HTTP_ADDR: ':8080'
-  URLSHORTENER_FAKELOAD: 'false'
+  URLSHORTENER_FAKELOAD: 'true'

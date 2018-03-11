@@ -35,5 +35,6 @@ fpm \
   -v ${VERSION} \
   --iteration=$(git rev-parse --short HEAD) \
   --description "${DESCRIPTION}" \
+  -d "stress" \
   -C ${PKG_BUILD_DIR}
 popd

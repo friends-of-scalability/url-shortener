@@ -14,7 +14,7 @@ Parameters:
     Default: "db.t2.micro"
   DBUser:
     Description: "User for database"
-    Type: "String"
+    Type: "AWS::SSM::Parameter::Value<String>"
   DBPassword:
     Description: "Password for database"
     Type: "AWS::SSM::Parameter::Value<String>"
@@ -34,6 +34,9 @@ Parameters:
   InstanceSecurityGroup:
     Description: Subnet
     Type: AWS::EC2::SecurityGroup::Id
+  StudentId:
+    Description: "Student Id"
+    Type: "String"
 
 Resources:
   DBSubnetGroup:
@@ -55,7 +58,8 @@ Resources:
         ToPort: '5432'
         SourceSecurityGroupId:
           Ref: InstanceSecurityGroup
-      VpcId: vpc-07c5ef8c4c0f071c9
+      VpcId:
+        Ref: VPC
 
   MyDatabase:
     Type: "AWS::RDS::DBInstance"
@@ -84,6 +88,23 @@ Resources:
        -
           "Fn::GetAtt": [ "DBEC2SecurityGroup", "GroupId" ]
 
+  DatabaseHostParameterStore:
+    Type: "AWS::SSM::Parameter"
+    Properties:
+      Name: !Join ["/",["",!Ref StudentId,"prod","db","host"]]
+      Description: "Database host"
+      Type: String
+      Value:
+        "Fn::GetAtt": [ "MyDatabase", "Endpoint.Address" ]
+
+  DatabasePortParameterStore:
+    Type: "AWS::SSM::Parameter"
+    Properties:
+      Name: !Join ["/",["",!Ref StudentId,"prod","db","port"]]
+      Description: "Database port"
+      Type: String
+      Value:
+        "Fn::GetAtt": [ "MyDatabase", "Endpoint.Port" ]
 Outputs:
   MasterConnectionString:
     Description: "connection string for the master database"

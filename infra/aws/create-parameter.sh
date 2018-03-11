@@ -13,4 +13,4 @@ NAME=$1
 TYPE=$2
 VALUE=$3
 
-aws ssm put-parameter --name ${NAME} --type ${TYPE} --value ${VALUE}
+aws ssm put-parameter --name ${NAME} --type ${TYPE} --value ${VALUE} --overwrite
