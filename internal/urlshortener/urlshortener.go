@@ -23,12 +23,12 @@ type shortURLService struct {
 	makeFakeLoad bool
 }
 
-func (u *shortURLService) IsHealthy() (bool, error) {
+func (s *shortURLService) IsHealthy() (bool, error) {
 	return true, nil
 }
 
-func (u *shortURLService) generateFakeLoad(s string) error {
-	duration, err := time.ParseDuration(s)
+func (s *shortURLService) generateFakeLoad(span string) error {
+	duration, err := time.ParseDuration(span)
 	if err != nil {
 		return err
 	}
@@ -63,40 +63,40 @@ func NewService(makeFakeLoad bool) Service {
 }
 
 // Login to the system.
-func (u *shortURLService) Shortify(URL string) (mapping *shortURL, err error) {
+func (s *shortURLService) Shortify(URL string) (mapping *shortURL, err error) {
 
 	if !valid.IsURL(URL) {
 		return nil, errMalformedURL
 	}
 
-	_, err = u.urlDatabase.ByURL(URL)
+	_, err = s.urlDatabase.ByURL(URL)
 	// URL not found is an expected error, otherwise return err
 	if err != errURLNotFound && err != nil {
 		return nil, err
 	}
 	item := &shortURL{URL: URL}
-	item, err = u.urlDatabase.Save(item)
+	item, err = s.urlDatabase.Save(item)
 	if err != nil {
 		return nil, err
 	}
 	return item, nil
 }
 
-func (u *shortURLService) GetInfo(shortURL string) (mapping *shortURL, err error) {
-	URL, err := u.urlDatabase.ByID(shortURL)
+func (s *shortURLService) GetInfo(shortURL string) (mapping *shortURL, err error) {
+	URL, err := s.urlDatabase.ByID(shortURL)
 	if err != nil {
 		return nil, err
 	}
 	return URL, nil
 }
 
-func (u *shortURLService) Resolve(shortURL string) (mapping *shortURL, err error) {
-	URL, err := u.GetInfo(shortURL)
+func (s *shortURLService) Resolve(shortURL string) (mapping *shortURL, err error) {
+	URL, err := s.GetInfo(shortURL)
 	if err != nil {
 		return nil, err
 	}
-	if u.makeFakeLoad {
-		err = u.generateFakeLoad("5s")
+	if s.makeFakeLoad {
+		err = s.generateFakeLoad("5s")
 		if err != nil {
 			return nil, fmt.Errorf("something went wrong generating load %v", err)
 		}
