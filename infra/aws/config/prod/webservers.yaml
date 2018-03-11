@@ -1,0 +1,9 @@
+template_path: templates/webservers.yaml
+
+parameters:
+  VPC: {{ var.vpc}}
+  Subnet0: {{ var.subnet0 }}
+  Subnet1: {{ var.subnet1 }}
+  Subnet2: {{ var.subnet2 }}
+  Domain: alumni.friendsofscalability.com
+  StudentId: {{ var.studentId }}

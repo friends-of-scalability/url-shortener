@@ -1,0 +1,102 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "AWS CloudFormation Database"
+Parameters:
+  DBName:
+    Description: "The database name"
+    Type: "String"
+  DBAllocatedStorage:
+    Description: "Assigned storage size"
+    Type: "Number"
+    Default: 20
+  DBInstanceClass:
+    Description: "Instance class"
+    Type: "String"
+    Default: "db.t2.micro"
+  DBUser:
+    Description: "User for database"
+    Type: "String"
+  DBPassword:
+    Description: "Password for database"
+    Type: "AWS::SSM::Parameter::Value<String>"
+    NoEcho: "true"
+  VPC:
+    Description: Choose which VPC this server should be deployed to
+    Type: AWS::EC2::VPC::Id
+  Subnet0:
+    Description: Subnet
+    Type: AWS::EC2::Subnet::Id
+  Subnet1:
+    Description: Subnet
+    Type: AWS::EC2::Subnet::Id
+  Subnet2:
+    Description: Subnet
+    Type: AWS::EC2::Subnet::Id
+  InstanceSecurityGroup:
+    Description: Subnet
+    Type: AWS::EC2::SecurityGroup::Id
+
+Resources:
+  DBSubnetGroup:
+    Type: "AWS::RDS::DBSubnetGroup"
+    Properties:
+      DBSubnetGroupDescription: "DB Subnet group"
+      SubnetIds:
+        - Ref: "Subnet0"
+        - Ref: "Subnet1"
+        - Ref: "Subnet2"
+
+  DBEC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Open database for access
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: '5432'
+        ToPort: '5432'
+        SourceSecurityGroupId:
+          Ref: InstanceSecurityGroup
+      VpcId: vpc-07c5ef8c4c0f071c9
+
+  MyDatabase:
+    Type: "AWS::RDS::DBInstance"
+    DeletionPolicy: "Snapshot"
+    Properties:
+      DBSubnetGroupName:
+        Ref: DBSubnetGroup
+      DBName:
+        Ref: "DBName"
+      AllocatedStorage:
+        Ref: "DBAllocatedStorage"
+      DBInstanceClass:
+        Ref: "DBInstanceClass"
+      Engine: "postgres"
+      EngineVersion: "10.1"
+      MasterUsername:
+        Ref: "DBUser"
+      MasterUserPassword:
+        Ref: "DBPassword"
+      PubliclyAccessible: true
+      Tags:
+        -
+          Key: "Name"
+          Value: "PostgreSQL Database"
+      VPCSecurityGroups:
+       -
+          "Fn::GetAtt": [ "DBEC2SecurityGroup", "GroupId" ]
+
+Outputs:
+  MasterConnectionString:
+    Description: "connection string for the master database"
+    Value:
+      "Fn::Join": [ "", [
+        {
+          "Fn::GetAtt": [ "MyDatabase", "Endpoint.Address" ]
+        },
+        ":",
+        {
+          "Fn::GetAtt": [ "MyDatabase", "Endpoint.Port" ]
+        },
+        "/",
+        {
+          "Ref": "DBName"
+        }]]

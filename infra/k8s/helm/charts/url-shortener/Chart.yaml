@@ -1,4 +1,4 @@
 apiVersion: v1
 description: URL Shortener k8s based
 name: url-shortener
-version: 0.1.0
+version: 0.1.2

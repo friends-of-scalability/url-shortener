@@ -39,7 +39,8 @@ type infoResponse struct {
 }
 
 type healthzResponse struct {
-	Err error `json:"error,omitempty"`
+	Msg string `json:"msg,omitempty"`
+	Err error  `json:"error,omitempty"`
 }
 
 func makeURLShortifyEndpoint(s Service) endpoint.Endpoint {
@@ -57,8 +58,11 @@ func makeURLShortifyEndpoint(s Service) endpoint.Endpoint {
 func makeURLHealthzEndpoint(s Service) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		// if db ok and service ok
-
-		return healthzResponse{}, nil
+		status, err := s.IsHealthy()
+		if !status {
+			return healthzResponse{Msg: "Nope! Something went wrong :(", Err: err}, nil
+		}
+		return healthzResponse{Msg: "Always look at the bright side of life :)"}, nil
 	}
 }
 

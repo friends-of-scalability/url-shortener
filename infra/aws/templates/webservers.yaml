@@ -1,0 +1,135 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "WebServers"
+Parameters:
+  VPC:
+    Description: "The id of the VPC"
+    Type: "AWS::EC2::VPC::Id"
+  Subnet0:
+    Description: "The id of the Subnet0"
+    Type: "AWS::EC2::Subnet::Id"
+  Subnet1:
+    Description: "The id of the Subnet1"
+    Type: "AWS::EC2::Subnet::Id"
+  Subnet2:
+    Description: "The id of the Subnet2"
+    Type: "AWS::EC2::Subnet::Id"
+  Domain:
+    Description: "Main Domain"
+    Type: "String"
+  StudentId:
+    Description: "Student Id"
+    Type: "String"
+Resources:
+  LoadBalancer:
+    Type: "AWS::ElasticLoadBalancingV2::LoadBalancer"
+    Properties:
+      Name: !Join [ "-", [ "urlshortener" ,!Ref StudentId] ]
+      Scheme: "internet-facing"
+      SecurityGroups:
+       - Ref: "LoadBalancerSecurityGroup"
+      Subnets:
+        - Ref: "Subnet0"
+        - Ref: "Subnet1"
+        - Ref: "Subnet2"
+
+  LoadBalancerListener:
+    Type: "AWS::ElasticLoadBalancingV2::Listener"
+    Properties:
+      DefaultActions:
+       - Type: "forward"
+         TargetGroupArn:
+           Ref: "LoadBalancerTargetGroup"
+      LoadBalancerArn:
+        Ref: "LoadBalancer"
+      Port: "80"
+      Protocol: "HTTP"
+  LoadBalancerTargetGroup:
+    Type: "AWS::ElasticLoadBalancingV2::TargetGroup"
+    Properties:
+      HealthCheckIntervalSeconds: 10
+      UnhealthyThresholdCount: 2
+      HealthyThresholdCount: 2
+      HealthCheckPath: /healthz
+      Port: 8080
+      Protocol: "HTTP"
+      VpcId:
+        Ref: "VPC"
+      Name: !Join [ "", [ "urlshortener" ,!Ref StudentId] ]
+  LoadBalancerSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: "Access to Load Balancer"
+      SecurityGroupIngress:
+       - CidrIp: "0.0.0.0/0"
+         FromPort: "80"
+         IpProtocol: "tcp"
+         ToPort: "80"
+       - CidrIp: "0.0.0.0/0"
+         FromPort: "443"
+         IpProtocol: "tcp"
+         ToPort: "443"
+      VpcId:
+        Ref: "VPC"
+  WebServerSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: "WebServer Security Group"
+      SecurityGroupIngress:
+       - CidrIp: "10.0.0.0/8"
+         FromPort: "8080"
+         IpProtocol: "tcp"
+         ToPort: "8080"
+      VpcId:
+        Ref: "VPC"
+  WebServerRole:
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+               -
+                  "ec2.amazonaws.com"
+            Action:
+               -
+                  "sts:AssumeRole"
+      Path: "/"
+      Policies:
+       -
+          PolicyName: "AllowGetParameters"
+          PolicyDocument:
+            Statement:
+             -
+                Effect: "Allow"
+                Action: "ssm:Get*"
+                Resource: !Join [ "/", [ "arn:aws:ssm:eu-west-1:046987341530:parameter" ,!Ref StudentId, "prod", "*"] ]
+            Version: "2012-10-17"
+    Type: "AWS::IAM::Role"
+  WebServerInstanceProfile:
+    Properties:
+      Path: "/"
+      Roles:
+       - Ref: "WebServerRole"
+    Type: "AWS::IAM::InstanceProfile"
+
+  LoadBalancerDns:
+    DependsOn: "LoadBalancer"
+    Type: "AWS::Route53::RecordSet"
+    Properties:
+      Comment: "Load Balancer"
+      HostedZoneName: !Join [ "", [ !Ref Domain, "."] ]
+      Name: !Join [ ".", [ !Ref StudentId, !Ref Domain ] ]
+      ResourceRecords:
+       - "Fn::GetAtt": [ "LoadBalancer", "DNSName" ]
+      TTL: 60
+      Type: "CNAME"
+Outputs:
+  WebServerSecurityGroup:
+    Description: "WebServers security group"
+    Value:
+      Ref: "WebServerSecurityGroup"
+  WebServerInstanceProfile:
+    Description: "WebServers Instance Profile"
+    Value:
+      Ref: "WebServerInstanceProfile"
