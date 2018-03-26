@@ -6,7 +6,7 @@ GOFMT_FILES?=$$(find . -name '*.go' | grep -v vendor)
 REV?=$$(git rev-parse --short HEAD)
 BRANCH?=$$(git rev-parse --abbrev-ref HEAD)
 BUILDFILES?=$$(find bin -mindepth 1 -maxdepth 1 -type f)
-VERSION?="0.0.1"
+VERSION?="0.0.2"
 MAIN_PATH="./cmd/url-shortener/"
 SCRIPT_PATH="./script"
 DOCKER_REPO?="${REPONAME}/${APPNAME}"
@@ -35,8 +35,10 @@ ci: buildonly generate-package
 
 generate-package:
 	@echo "GENERATE PACKAGE..."
-	bash script/build-package.sh full
-
+	bash script/build-package.sh resolver
+	bash script/build-package.sh shortener
+	bash script/build-package.sh apigateway
+	bash script/build-package.sh hystrixdashboard
 
 tools:
 	@echo "GO TOOLS installation..."

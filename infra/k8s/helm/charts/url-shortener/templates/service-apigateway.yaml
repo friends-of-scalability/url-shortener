@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: "{{ template "url-shortener.fullname" . }}-apigateway"
+  labels:
+    app: {{ template "url-shortener.name" . }}
+    chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  type: {{ .Values.service.apigateway.type }}
+  ports:
+    - targetPort: {{ .Values.service.apigateway.internalPort }}
+      port: {{ .Values.service.apigateway.externalPort }}
+      protocol: TCP
+      name: {{ .Values.service.apigateway.name }}
+  selector:
+    app: "{{ template "url-shortener.name" . }}-apigateway"
+    release: {{ .Release.Name }}

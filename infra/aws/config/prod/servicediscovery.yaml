@@ -1,0 +1,5 @@
+template_path: templates/servicediscovery.yaml
+
+parameters:
+  Name: {{ var.studentId }}
+  VPC: {{ var.vpc}}

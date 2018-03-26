@@ -32,8 +32,8 @@ func newPostgresStorage(host, port, user, password, dbName string) (shortURLStor
 	}
 
 	// Create table if not exists
-	strQuery := "CREATE TABLE IF NOT EXISTS shortener (uid serial NOT NULL, url VARCHAR not NULL UNIQUE, " +
-		"count INTEGER DEFAULT 0);"
+	strQuery := "CREATE TABLE IF NOT EXISTS shortener (uid BIGSERIAL NOT NULL, url VARCHAR not NULL UNIQUE, " +
+		"count BIGINT DEFAULT 0);"
 
 	_, err = db.Exec(strQuery)
 	if err != nil {
@@ -79,21 +79,38 @@ func (u *shortURLPostgresRepository) ByID(id string) (*shortURL, error) {
 	var item shortURL
 	err = u.db.QueryRow("SELECT url, count FROM shortener where uid=$1 limit 1", dbID).
 		Scan(&item.URL, &item.VisitsCounter)
+	item.ID = dbID
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, errURLNotFound
+		}
+		return nil, err
+	}
 	if err != nil {
 		return nil, err
 	}
-	item.ID = dbID
+
 	return &item, nil
 }
 
-// ByShortURL finds and URL in our databse.
-func (u *shortURLPostgresRepository) Save(item *shortURL) (*shortURL, error) {
-	var id uint64
+func (u *shortURLPostgresRepository) getURLAndUpdateVisitsCounter(item *shortURL) (*shortURL, error) {
 	m, err := u.ByURL(item.URL)
-	if err != errURLNotFound {
-		return m, err
+	if m != nil {
+		m.VisitsCounter++
+		_, err = u.db.Exec("UPDATE shortener SET count=$2 WHERE uid = $1;", m.ID, m.VisitsCounter)
+		if err != nil {
+			return nil, err
+		}
+		return m, nil
+	} else if err != errURLNotFound {
+		return nil, err
 	}
-	err = u.db.QueryRow("INSERT INTO shortener(url,count) VALUES($1,$2) returning uid;", item.URL, 0).Scan(&id)
+	return nil, nil
+}
+func (u *shortURLPostgresRepository) createNewItem(item *shortURL) (*shortURL, error) {
+	var id uint64
+	err := u.db.QueryRow("INSERT INTO shortener(url,count) VALUES($1,$2) returning uid;", item.URL, 0).Scan(&id)
 	if err != nil {
 		return nil, err
 	}
@@ -102,4 +119,16 @@ func (u *shortURLPostgresRepository) Save(item *shortURL) (*shortURL, error) {
 	mapping.VisitsCounter = 0
 	mapping.ID = id
 	return &mapping, nil
+}
+
+// ByShortURL finds and URL in our databse.
+func (u *shortURLPostgresRepository) Save(item *shortURL) (*shortURL, error) {
+
+	retrievedItem, err := u.getURLAndUpdateVisitsCounter(item)
+	if retrievedItem != nil {
+	} else if err != nil {
+		return nil, err
+	}
+
+	return u.createNewItem(item)
 }

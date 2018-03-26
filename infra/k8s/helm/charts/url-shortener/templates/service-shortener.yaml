@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: "{{ template "url-shortener.fullname" . }}-shortener"
+  labels:
+    app: {{ template "url-shortener.name" . }}
+    chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - targetPort: {{ .Values.service.shortener.internalPort }}
+      port: {{ .Values.service.shortener.internalPort }}
+      protocol: TCP
+      name: {{ .Values.service.shortener.name }}
+  selector:
+    app: "{{ template "url-shortener.name" . }}-shortener"
+    release: {{ .Release.Name }}

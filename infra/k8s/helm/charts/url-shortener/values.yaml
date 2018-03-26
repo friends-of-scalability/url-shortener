@@ -4,13 +4,21 @@
 replicaCount: 1
 image:
   repository: url-shortener/urlshortener
-  tag: 0.0.1
+  tag: latest
   pullPolicy: IfNotPresent
 service:
-  name: url-shortener
-  type: NodePort
-  externalPort: 31000
-  internalPort: 8080
+  apigateway:
+    name: url-shortener-apigateway
+    type: NodePort
+    externalPort: 31000
+    internalPort: 8080
+  resolver:
+    name: url-shortener-resolver
+    internalPort: 8080
+  shortener:
+    name: url-shortener-shortener
+    internalPort: 8080
+
 ingress:
   enabled: false
   # Used to create an Ingress record.
@@ -24,7 +32,13 @@ ingress:
     # - secretName: chart-example-tls
     #   hosts:
     #     - chart-example.local
-resources: {}
+resources:
+  limits:
+    cpu: 2
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
   # We usually recommend not to specify default resources and to leave this as a conscious
   # choice for the user. This also increases chances charts run on environments with little
   # resources, such as Minikube. If you do want to specify resources, uncomment the following

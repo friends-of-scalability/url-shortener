@@ -16,5 +16,5 @@ parameters:
   PublicSubnetRange1: 10.15.2.0/23
   PublicSubnetRange2: 10.15.4.0/23
   PublicSubnetRange3: 10.15.6.0/23
-  VpcNetworkRange: 10.15.0.0/16
   VpcName: {{ var.VpcName }}
+  VpcNetworkRange: 10.15.0.0/16

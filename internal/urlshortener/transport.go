@@ -2,9 +2,9 @@ package urlshortener
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"net/http"
+
+	"github.com/afex/hystrix-go/hystrix"
 
 	"github.com/gorilla/mux"
 
@@ -37,20 +37,32 @@ func MakeHandler(ctx context.Context, us Service, logger kitlog.Logger) http.Han
 		encodeResponse,
 		opts...,
 	)
+
+	hystrix.ConfigureCommand("shortener Request", hystrix.CommandConfig{Timeout: 1000})
+	hystrix.ConfigureCommand("resolver Request", hystrix.CommandConfig{Timeout: 1000})
+	hystrix.ConfigureCommand("info Request", hystrix.CommandConfig{Timeout: 1000})
+
+	shortenerEndpoint := Hystrix("shortener Request",
+		"Service currently unavailable", logger)(makeURLShortifyEndpoint(us))
+	resolverEndpoint := Hystrix("resolver Request",
+		"Service currently unavailable", logger)(makeURLRedirectEndpoint(us))
+	infoEndpoint := Hystrix("info Request",
+		"Service currently unavailable", logger)(makeURLInfoEndpoint(us))
+
 	URLShortifyHandler := kithttp.NewServer(
-		makeURLShortifyEndpoint(us),
+		shortenerEndpoint,
 		decodeURLShortenerRequest,
 		encodeResponse,
 		opts...,
 	)
 	URLRedirectHandler := kithttp.NewServer(
-		makeURLRedirectEndpoint(us),
+		resolverEndpoint,
 		decodeURLRedirectRequest,
 		encodeRedirectResponse,
 		opts...,
 	)
 	URLInfoHandler := kithttp.NewServer(
-		makeURLInfoEndpoint(us),
+		infoEndpoint,
 		decodeURLInfoRequest,
 		encodeResponse,
 		opts...,
@@ -62,76 +74,4 @@ func MakeHandler(ctx context.Context, us Service, logger kitlog.Logger) http.Han
 	r.Handle("/info/{shortURL}", URLInfoHandler).Methods("GET")
 
 	return r
-}
-
-func decodeURLShortenerRequest(c context.Context, r *http.Request) (interface{}, error) {
-	decoder := json.NewDecoder(r.Body)
-	var t shortURL
-	if !decoder.More() {
-		return nil, errors.New("Empty request, cannot shortify the emptiness")
-
-	}
-	err := decoder.Decode(&t)
-	if err != nil {
-		return nil, err
-	}
-	if t.URL == "" {
-		return nil, errors.New("Empty request, cannot shortify the emptiness")
-	}
-	return shortenerRequest{URL: t.URL}, nil
-}
-
-func decodeURLRedirectRequest(c context.Context, r *http.Request) (interface{}, error) {
-	shURL := mux.Vars(r)
-	return redirectRequest{id: shURL["shortURL"]}, nil
-}
-
-func decodeURLInfoRequest(c context.Context, r *http.Request) (interface{}, error) {
-	shURL := mux.Vars(r)
-	return infoRequest{id: shURL["shortURL"]}, nil
-
-}
-
-func encodeRedirectResponse(ctx context.Context, w http.ResponseWriter, response interface{}) error {
-	if e, ok := response.(errorer); ok && e.error() != nil {
-		encodeError(ctx, e.error(), w)
-		return nil
-	}
-	if e, ok := response.(redirectResponse); ok && e.error() == nil {
-		w.Header().Set("Location", e.URL)
-		w.Header().Set("Referer", e.id)
-		w.WriteHeader(http.StatusPermanentRedirect)
-		return nil
-	}
-	encodeError(ctx, errMalformedURL, w)
-	return nil
-}
-
-func encodeResponse(ctx context.Context, w http.ResponseWriter, response interface{}) error {
-	if e, ok := response.(errorer); ok && e.error() != nil {
-		encodeError(ctx, e.error(), w)
-		return nil
-	}
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	return json.NewEncoder(w).Encode(response)
-}
-
-type errorer interface {
-	error() error
-}
-
-// encode errors from business-logic
-func encodeError(_ context.Context, err error, w http.ResponseWriter) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	switch err {
-	case errURLNotFound:
-		w.WriteHeader(http.StatusNotFound)
-	case errMalformedURL:
-		w.WriteHeader(http.StatusBadRequest)
-	default:
-		w.WriteHeader(http.StatusInternalServerError)
-	}
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"error": err.Error(),
-	})
 }

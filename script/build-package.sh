@@ -22,8 +22,9 @@ PKG_BUILD_DIR="/tmp/rpm.${RANDOM}"; mkdir "${PKG_BUILD_DIR}"
 
 mkdir -p ${PKG_BUILD_DIR}/opt/url-shortener/bin/
 
-cp bin/urlshortener ${PKG_BUILD_DIR}/opt/url-shortener/bin/url-shortener
-rsync -av script/deb/ ${PKG_BUILD_DIR}/
+if [[ "$NAME" != "hystrixdashboard" ]];then
+  cp bin/urlshortener ${PKG_BUILD_DIR}/opt/url-shortener/bin/url-shortener
+fi
 
 rsync -av script/deb/$1/ ${PKG_BUILD_DIR}/
 
@@ -36,5 +37,6 @@ fpm \
   --iteration=$(git rev-parse --short HEAD) \
   --description "${DESCRIPTION}" \
   -d "stress" \
+  --after-install ${PKG_BUILD_DIR}/usr/local/bin/after_install.sh \
   -C ${PKG_BUILD_DIR}
 popd

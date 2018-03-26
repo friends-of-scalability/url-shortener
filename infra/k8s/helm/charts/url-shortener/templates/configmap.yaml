@@ -14,3 +14,5 @@ data:
   URLSHORTENER_STORAGE: postgres
   URLSHORTENER_HTTP_ADDR: ':8080'
   URLSHORTENER_FAKELOAD: 'true'
+  URLSHORTENER_SD_RESOLVER: {{ template "url-shortener.fullname" . }}-resolver.{{ .Release.Namespace }}.svc.cluster.local
+  URLSHORTENER_SD_SHORTENER: {{ template "url-shortener.fullname" . }}-shortener.{{ .Release.Namespace }}.svc.cluster.local

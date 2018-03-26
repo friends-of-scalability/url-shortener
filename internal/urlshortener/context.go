@@ -7,5 +7,6 @@ func (c contextKey) String() string {
 }
 
 var (
-	contextKeyHTTPAddress = contextKey("URLShortenerServiceHTTPAddr")
+	contextKeyHTTPAddress      = contextKey("URLShortenerServiceHTTPAddr")
+	contextKeyAPIGWHTTPAddress = contextKey("URLShortenerServiceAPIGWAddr")
 )

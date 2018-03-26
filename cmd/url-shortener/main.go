@@ -2,12 +2,14 @@ package main
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 
+	"github.com/afex/hystrix-go/hystrix"
 	"github.com/friends-of-scalability/url-shortener/cmd/config"
 	"github.com/friends-of-scalability/url-shortener/internal/urlshortener"
 	"github.com/go-kit/kit/log"
@@ -27,6 +29,9 @@ func bindEnvironmentVariables() {
 	viper.BindEnv("postgresql.port")
 	viper.BindEnv("postgresql.user")
 	viper.BindEnv("postgresql.password")
+	viper.BindEnv("role")
+	viper.BindEnv("sd.resolver")
+	viper.BindEnv("sd.shortener")
 }
 
 func bindFlags(rootCmd *cobra.Command, c *config.Config) error {
@@ -37,18 +42,38 @@ func bindFlags(rootCmd *cobra.Command, c *config.Config) error {
 	rootCmd.PersistentFlags().IntVar(&c.Postgresql.Port, "postgresql.port", 5432, "Postgres port")
 	rootCmd.PersistentFlags().StringVar(&c.Postgresql.User, "postgresql.user", "", "Postgres user")
 	rootCmd.PersistentFlags().StringVar(&c.Postgresql.Password, "postgresql.password", "", "Postgres password")
+	rootCmd.PersistentFlags().StringVar(&c.ServiceDiscovery.Resolver, "sd.resolver", "", "DNS SRV for resolvers")
+	rootCmd.PersistentFlags().StringVar(&c.ServiceDiscovery.Shortener, "sd.shortener", "", "DNS SRV for shorteners")
+	rootCmd.PersistentFlags().StringVar(&c.Role, "role", "full", "which role will do this instance full|apigateway|resolver|shortener")
+
 	if err := viper.BindPFlags(rootCmd.PersistentFlags()); err != nil {
 		return err
 	}
 	bindEnvironmentVariables()
+
+	return nil
+}
+
+func initializeConfig(c *config.Config) {
 	c.HTTPAddress = viper.GetString("http.addr")
+	host, port, err := net.SplitHostPort(c.HTTPAddress)
+	if err != nil {
+		c.HTTPAddress = ":8080"
+		c.ExposedHost = ""
+		c.ExposedPort = "8080"
+	} else {
+		c.ExposedHost = host
+		c.ExposedPort = port
+	}
 	c.EnableFakeLoad = viper.GetBool("fakeload")
 	c.StorageType = viper.GetString("storage")
+	c.Role = viper.GetString("role")
 	c.Postgresql.Host = viper.GetString("postgresql.host")
 	c.Postgresql.Port = viper.GetInt("postgresql.port")
 	c.Postgresql.User = viper.GetString("postgresql.user")
 	c.Postgresql.Password = viper.GetString("postgresql.password")
-	return nil
+	c.ServiceDiscovery.Resolver = viper.GetString("sd.resolver")
+	c.ServiceDiscovery.Shortener = viper.GetString("sd.shortener")
 }
 
 func createCLI(c *config.Config) error {
@@ -68,6 +93,7 @@ func createCLI(c *config.Config) error {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+	initializeConfig(c)
 	return nil
 
 }
@@ -85,7 +111,6 @@ func main() {
 		if err != nil {
 			logger.Log("fatal", "config", "error", err)
 		}
-		fmt.Printf("%+v\n", cfg)
 	}
 	var ctx context.Context
 	{
@@ -105,7 +130,16 @@ func main() {
 
 	var h http.Handler
 	{
-		h = urlshortener.MakeHandler(ctx, s, log.With(logger, "component", "HTTP"))
+		switch cfg.Role {
+		case "full":
+			h = urlshortener.MakeHandler(ctx, s, log.With(logger, "component", "HTTP"))
+		case "resolver":
+			h = urlshortener.MakeResolverHandler(ctx, s, log.With(logger, "component", "HTTP"))
+		case "shortener":
+			h = urlshortener.MakeShortenerHandler(ctx, s, log.With(logger, "component", "HTTP"))
+		case "apigateway":
+			h = urlshortener.MakeAPIGWHandler(ctx, s, log.With(logger, "component", "HTTP"), &cfg)
+		}
 	}
 
 	errs := make(chan error)
@@ -116,7 +150,14 @@ func main() {
 	}()
 
 	go func() {
-		logger.Log("transport", "HTTP", "addr", cfg.HTTPAddress)
+		logger.Log("transport", "Hystrix Stream Server", "addr", ":9000", "STORAGE", cfg.StorageType, "FAKELOAD", cfg.EnableFakeLoad)
+
+		hystrixStreamHandler := hystrix.NewStreamHandler()
+		hystrixStreamHandler.Start()
+		errs <- http.ListenAndServe(":9000", hystrixStreamHandler)
+	}()
+	go func() {
+		logger.Log("transport", "HTTP", "addr", cfg.HTTPAddress, "STORAGE", cfg.StorageType, "FAKELOAD", cfg.EnableFakeLoad)
 		errs <- http.ListenAndServe(cfg.HTTPAddress, h)
 
 	}()

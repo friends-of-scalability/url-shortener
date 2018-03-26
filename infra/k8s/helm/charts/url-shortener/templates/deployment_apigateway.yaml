@@ -1,9 +1,9 @@
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
-  name: {{ template "url-shortener.fullname" . }}
+  name: "{{ template "url-shortener.fullname" . }}-apigateway"
   labels:
-    app: {{ template "url-shortener.name" . }}
+    app: "{{ template "url-shortener.name" . }}-apigw"
     chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
     release: {{ .Release.Name }}
     heritage: {{ .Release.Service }}
@@ -14,7 +14,7 @@ spec:
   template:
     metadata:
       labels:
-        app: {{ template "url-shortener.name" . }}
+        app: "{{ template "url-shortener.name" . }}-apigateway"
         release: {{ .Release.Name }}
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
@@ -32,16 +32,19 @@ spec:
                 secretKeyRef:
                   name: {{ .Release.Name }}-postgresql
                   key: postgres-password
+            - name: URLSHORTENER_ROLE
+              value: "apigateway"
           ports:
-            - containerPort: {{ .Values.service.internalPort }}
+            - containerPort: {{ .Values.service.apigateway.internalPort }}
+            - containerPort: 9000
           livenessProbe:
             httpGet:
               path: /healthz
-              port: {{ .Values.service.internalPort }}
+              port: {{ .Values.service.apigateway.internalPort }}
           readinessProbe:
             httpGet:
               path: /healthz
-              port: {{ .Values.service.internalPort }}
+              port: {{ .Values.service.apigateway.internalPort }}
           resources:
 {{ toYaml .Values.resources | indent 12 }}
     {{- if .Values.nodeSelector }}

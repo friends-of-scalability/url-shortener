@@ -1,0 +1,83 @@
+#! /bin/bash
+### BEGIN INIT INFO
+# Provides:          sd
+# Required-Start: $remote_fs $syslog
+# Required-Stop:  $remote_fs $syslog
+# Default-Start: 1 2 3 4 5
+# Default-Stop:  0 6
+# Short-Description: register/deregister this instance in the service discovery.
+# Description:
+### END INIT INFO
+
+PATH=/sbin:/usr/sbin:/bin:/usr/bin:/usr/local/bin
+
+. /lib/lsb/init-functions
+
+function unset_if_null_or_empty() {
+    if [[ -z "${!1// }" || ""${!1}"" == "null" ]];then
+        unset "${1}"
+    fi
+}
+
+function get_dependencies() {
+    # Install the AWS CLI
+    apt-get -y install python2.7 curl jq
+    curl -o /tmp/get-pip.py https://bootstrap.pypa.io/get-pip.py
+    python2.7 /tmp/get-pip.py
+    pip install awscli
+    # Getting region
+}
+
+function get_parameter_store(){
+    local VAR=$1
+    local REGION=$2
+    echo $(aws ssm get-parameters --names $VAR  --with-decryption --region $REGION --output json | jq .Parameters[0].Value | tr -d '"')
+}
+
+function get_environmental_variables() {
+    EC2_AVAIL_ZONE=$(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone)
+    export EC2_REGION=$(curl --silent http://169.254.169.254/latest/dynamic/instance-identity/document | jq -r .region)
+    STUDENT=$(curl -s http://169.254.169.254/latest/meta-data/iam/info | jq .InstanceProfileArn | egrep -o 'student-\w+' | cut -f2 -d'-')
+
+    # Trying to retrieve parameters from the EC2 Parameter Store
+    export URLSHORTENER_ROLE=$(cat /etc/urlshortener/role)
+    export URLSHORTENER_SERVICE_ID=$(get_parameter_store "/"$STUDENT"/prod/"$URLSHORTENER_ROLE"/service" $EC2_REGION)
+    export URLSHORTENER_HTTP_ADDR=$(get_parameter_store "/"$STUDENT"/prod/http/addr" $EC2_REGION)
+    export URLSHORTENER_IP=$(curl --silent http://169.254.169.254/latest/dynamic/instance-identity/document | jq .privateIp | tr -d '"' )
+    export URLSHORTENER_INSTANCEID=$(curl --silent http://169.254.169.254/latest/dynamic/instance-identity/document | jq .instanceId | tr -d '"')
+    export URLSHORTENER_PORT=$(echo "$URLSHORTENER_HTTP_ADDR" | cut -f2 -d':')
+    if [[ "$URLSHORTENER_PORT" == "null"  ]];then
+        URLSHORTENER_PORT="8080"
+    fi
+}
+
+
+function register_instance() {
+    get_dependencies
+    get_environmental_variables
+    aws servicediscovery register-instance --region $EC2_REGION --service-id $URLSHORTENER_SERVICE_ID --instance-id $URLSHORTENER_INSTANCEID --attributes AWS_INSTANCE_IPV4=$URLSHORTENER_IP,AWS_INSTANCE_PORT=$URLSHORTENER_PORT
+}
+
+function deregister_instance() {
+    get_dependencies
+    get_environmental_variables
+    aws servicediscovery deregister-instance --region $EC2_REGION --service-id $URLSHORTENER_SERVICE_ID --instance-id $URLSHORTENER_INSTANCEID
+}
+
+
+case "$1" in
+  start)
+	register_instance
+    ;;
+  restart|reload|force-reload)
+	echo "Error: argument '$1' not supported" >&2
+	exit 3
+	;;
+  stop)
+    deregister_instance
+	;;
+  *)
+	echo "Usage: $0 start|stop" >&2
+	exit 3
+	;;
+esac

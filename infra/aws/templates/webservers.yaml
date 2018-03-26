@@ -55,6 +55,32 @@ Resources:
       VpcId:
         Ref: "VPC"
       Name: !Join [ "", [ "urlshortener" ,!Ref StudentId] ]
+  HystrixLoadBalancerTargetGroup:
+    Type: "AWS::ElasticLoadBalancingV2::TargetGroup"
+    Properties:
+      HealthCheckIntervalSeconds: 10
+      UnhealthyThresholdCount: 2
+      HealthyThresholdCount: 2
+      HealthCheckPath: /hystrix
+      Port: 9002
+      Protocol: "HTTP"
+      VpcId:
+        Ref: "VPC"
+      Name: !Join [ "", [ "urlshortener" ,!Ref StudentId,"hystrix"] ]
+
+  HystrixListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+      - Type: forward
+        TargetGroupArn: !Ref HystrixLoadBalancerTargetGroup
+      Conditions:
+      - Field: host-header
+        Values:
+          - !Join [ ".", [ "hystrix", !Ref StudentId, !Ref Domain ] ]
+      ListenerArn: !Ref LoadBalancerListener
+      Priority: 1
+
   LoadBalancerSecurityGroup:
     Type: "AWS::EC2::SecurityGroup"
     Properties:
@@ -75,10 +101,21 @@ Resources:
     Properties:
       GroupDescription: "WebServer Security Group"
       SecurityGroupIngress:
-       - CidrIp: "10.0.0.0/8"
-         FromPort: "8080"
-         IpProtocol: "tcp"
-         ToPort: "8080"
+       # application port if you change the port change this!
+        - CidrIp: "10.0.0.0/8"
+          FromPort: "8080"
+          IpProtocol: "tcp"
+          ToPort: "8080"
+       # hystrix stream port
+        - CidrIp: "10.0.0.0/8"
+          FromPort: "9000"
+          IpProtocol: "tcp"
+          ToPort: "9000"
+      # hystrix dashboard port
+        - CidrIp: "10.0.0.0/8"
+          FromPort: "9002"
+          IpProtocol: "tcp"
+          ToPort: "9002"
       VpcId:
         Ref: "VPC"
   WebServerRole:
@@ -104,6 +141,14 @@ Resources:
                 Effect: "Allow"
                 Action: "ssm:Get*"
                 Resource: !Join [ "/", [ "arn:aws:ssm:eu-west-1:046987341530:parameter" ,!Ref StudentId, "prod", "*"] ]
+             -
+                Effect: "Allow"
+                Action: "servicediscovery:*"
+                Resource: "*"
+             -
+                Effect: "Allow"
+                Action: "route53:*"
+                Resource: "*"
             Version: "2012-10-17"
     Type: "AWS::IAM::Role"
   WebServerInstanceProfile:
@@ -124,6 +169,18 @@ Resources:
        - "Fn::GetAtt": [ "LoadBalancer", "DNSName" ]
       TTL: 60
       Type: "CNAME"
+  HystrixLoadBalancerDns:
+    DependsOn: "LoadBalancer"
+    Type: "AWS::Route53::RecordSet"
+    Properties:
+      Comment: "Load Balancer"
+      HostedZoneName: !Join [ "", [ !Ref Domain, "."] ]
+      Name: !Join [ ".", [ "hystrix",!Ref StudentId, !Ref Domain ] ]
+      ResourceRecords:
+       - "Fn::GetAtt": [ "LoadBalancer", "DNSName" ]
+      TTL: 60
+      Type: "CNAME"
+
 Outputs:
   WebServerSecurityGroup:
     Description: "WebServers security group"

@@ -114,11 +114,12 @@ func (s *shortURLService) Resolve(shortURL string) (mapping *shortURL, err error
 		return nil, err
 	}
 	if s.makeFakeLoad {
-		err = s.generateFakeLoad("5s")
+		err = s.generateFakeLoad("1s")
 		if err != nil {
 			return nil, fmt.Errorf("something went wrong generating load %v", err)
 		}
 	}
 	URL.VisitsCounter++
+	s.urlDatabase.Save(URL)
 	return URL, nil
 }
