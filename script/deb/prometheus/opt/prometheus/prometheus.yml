@@ -1,0 +1,41 @@
+global:
+  scrape_interval:     15s # By default, scrape targets every 15 seconds.
+
+# A scrape configuration containing exactly one endpoint to scrape:
+# Here it's Prometheus itself.
+scrape_configs:
+  # The job name is added as a label `job=<job_name>` to any timeseries scraped from this config.
+  - job_name: 'prometheus'
+
+    # Override the global default and scrape targets from this job every 5 seconds.
+    scrape_interval: 5s
+
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          group: 'local'
+
+  - job_name: 'urlshortener-apigateway'
+    scrape_interval: 5s
+    static_configs:
+      - targets: ['fabian.alumni.friendsofscalability.com']
+        labels:
+          group: 'urlshortener'
+          component: 'apigateway'
+
+  - job_name: 'urlshortener-resolver-and-shorteners'
+    scrape_interval: 5s
+    dns_sd_configs:
+    - names:
+      - 'resolver.fabian.aws'
+      - 'shortener.fabian.aws'
+
+    relabel_configs:
+    - source_labels: ['__meta_dns_name']
+      regex:         '(.+?)\..+?\.aws'
+      target_label:  'component'
+      replacement:   '$1'
+    - source_labels: ['__meta_dns_name']
+      regex:         '.+?\.(.+?)\.aws'
+      target_label:  'name'
+      replacement:   '$1'

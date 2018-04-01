@@ -39,6 +39,9 @@ generate-package:
 	bash script/build-package.sh shortener
 	bash script/build-package.sh apigateway
 	bash script/build-package.sh hystrixdashboard
+	bash script/build-package.sh prometheus
+	bash script/build-package.sh zipkin
+
 
 tools:
 	@echo "GO TOOLS installation..."

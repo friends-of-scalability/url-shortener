@@ -1,11 +1,13 @@
 package urlshortener
 
+import "context"
+
 // Service provides operations on Users.
 type Service interface {
 	//Creates a new shortURL from a longURL
-	Shortify(longURL string) (*shortURL, error)
+	Shortify(ctx context.Context, longURL string) (*shortURL, error)
 	//Retrieves a long URL from a short one
-	Resolve(shortURL string) (*shortURL, error)
-	GetInfo(shortURL string) (*shortURL, error)
+	Resolve(ctx context.Context, shortURL string) (*shortURL, error)
+	GetInfo(ctx context.Context, shortURL string) (*shortURL, error)
 	IsHealthy() (bool, error)
 }

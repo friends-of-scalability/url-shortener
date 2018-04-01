@@ -22,7 +22,7 @@ PKG_BUILD_DIR="/tmp/rpm.${RANDOM}"; mkdir "${PKG_BUILD_DIR}"
 
 mkdir -p ${PKG_BUILD_DIR}/opt/url-shortener/bin/
 
-if [[ "$NAME" != "hystrixdashboard" ]];then
+if [[ "$NAME" != "hystrixdashboard" || "$NAME" != "zipkin"  || "$NAME" != "prometheus" ]];then
   cp bin/urlshortener ${PKG_BUILD_DIR}/opt/url-shortener/bin/url-shortener
 fi
 

@@ -67,6 +67,43 @@ Resources:
       VpcId:
         Ref: "VPC"
       Name: !Join [ "", [ "urlshortener" ,!Ref StudentId,"hystrix"] ]
+  PrometheusLoadBalancerTargetGroup:
+    Type: "AWS::ElasticLoadBalancingV2::TargetGroup"
+    Properties:
+      HealthCheckIntervalSeconds: 10
+      UnhealthyThresholdCount: 2
+      HealthyThresholdCount: 2
+      HealthCheckPath: /graph
+      Port: 9090
+      Protocol: "HTTP"
+      VpcId:
+        Ref: "VPC"
+      Name: !Join [ "", [ "urlshortener" ,!Ref StudentId,"prometheus"] ]
+  GrafanaLoadBalancerTargetGroup:
+    Type: "AWS::ElasticLoadBalancingV2::TargetGroup"
+    Properties:
+      HealthCheckIntervalSeconds: 10
+      UnhealthyThresholdCount: 2
+      HealthyThresholdCount: 2
+      HealthCheckPath: /login
+      Port: 3000
+      Protocol: "HTTP"
+      VpcId:
+        Ref: "VPC"
+      Name: !Join [ "", [ "urlshortener" ,!Ref StudentId,"grafana"] ]
+
+  ZipkinLoadBalancerTargetGroup:
+    Type: "AWS::ElasticLoadBalancingV2::TargetGroup"
+    Properties:
+      HealthCheckIntervalSeconds: 10
+      UnhealthyThresholdCount: 2
+      HealthyThresholdCount: 2
+      HealthCheckPath: /zipkin/
+      Port: 9411
+      Protocol: "HTTP"
+      VpcId:
+        Ref: "VPC"
+      Name: !Join [ "", [ "urlshortener" ,!Ref StudentId,"zipkin"] ]
 
   HystrixListenerRule:
     Type: AWS::ElasticLoadBalancingV2::ListenerRule
@@ -80,6 +117,45 @@ Resources:
           - !Join [ ".", [ "hystrix", !Ref StudentId, !Ref Domain ] ]
       ListenerArn: !Ref LoadBalancerListener
       Priority: 1
+
+  PrometheusListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+      - Type: forward
+        TargetGroupArn: !Ref PrometheusLoadBalancerTargetGroup
+      Conditions:
+      - Field: host-header
+        Values:
+          - !Join [ ".", [ "prometheus", !Ref StudentId, !Ref Domain ] ]
+      ListenerArn: !Ref LoadBalancerListener
+      Priority: 2
+
+  GrafanaListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+      - Type: forward
+        TargetGroupArn: !Ref GrafanaLoadBalancerTargetGroup
+      Conditions:
+      - Field: host-header
+        Values:
+          - !Join [ ".", [ "grafana", !Ref StudentId, !Ref Domain ] ]
+      ListenerArn: !Ref LoadBalancerListener
+      Priority: 3
+
+  ZipkinListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+      - Type: forward
+        TargetGroupArn: !Ref ZipkinLoadBalancerTargetGroup
+      Conditions:
+      - Field: host-header
+        Values:
+          - !Join [ ".", [ "zipkin", !Ref StudentId, !Ref Domain ] ]
+      ListenerArn: !Ref LoadBalancerListener
+      Priority: 4
 
   LoadBalancerSecurityGroup:
     Type: "AWS::EC2::SecurityGroup"
@@ -116,6 +192,21 @@ Resources:
           FromPort: "9002"
           IpProtocol: "tcp"
           ToPort: "9002"
+      # zipkin dashboard port
+        - CidrIp: "10.0.0.0/8"
+          FromPort: "9411"
+          IpProtocol: "tcp"
+          ToPort: "9411"
+      # prometheus dashboard port
+        - CidrIp: "10.0.0.0/8"
+          FromPort: "9090"
+          IpProtocol: "tcp"
+          ToPort: "9090"
+      # grafana dashboard port
+        - CidrIp: "10.0.0.0/8"
+          FromPort: "3000"
+          IpProtocol: "tcp"
+          ToPort: "3000"
       VpcId:
         Ref: "VPC"
   WebServerRole:
@@ -180,6 +271,46 @@ Resources:
        - "Fn::GetAtt": [ "LoadBalancer", "DNSName" ]
       TTL: 60
       Type: "CNAME"
+  PrometheusLoadBalancerDns:
+    DependsOn: "LoadBalancer"
+    Type: "AWS::Route53::RecordSet"
+    Properties:
+      Comment: "Load Balancer"
+      HostedZoneName: !Join [ "", [ !Ref Domain, "."] ]
+      Name: !Join [ ".", [ "prometheus",!Ref StudentId, !Ref Domain ] ]
+      ResourceRecords:
+       - "Fn::GetAtt": [ "LoadBalancer", "DNSName" ]
+      TTL: 60
+      Type: "CNAME"
+  GrafanaLoadBalancerDns:
+    DependsOn: "LoadBalancer"
+    Type: "AWS::Route53::RecordSet"
+    Properties:
+      Comment: "Load Balancer"
+      HostedZoneName: !Join [ "", [ !Ref Domain, "."] ]
+      Name: !Join [ ".", [ "grafana",!Ref StudentId, !Ref Domain ] ]
+      ResourceRecords:
+       - "Fn::GetAtt": [ "LoadBalancer", "DNSName" ]
+      TTL: 60
+      Type: "CNAME"
+  ZipkinLoadBalancerDns:
+    DependsOn: "LoadBalancer"
+    Type: "AWS::Route53::RecordSet"
+    Properties:
+      Comment: "Load Balancer"
+      HostedZoneName: !Join [ "", [ !Ref Domain, "."] ]
+      Name: !Join [ ".", [ "zipkin",!Ref StudentId, !Ref Domain ] ]
+      ResourceRecords:
+       - "Fn::GetAtt": [ "LoadBalancer", "DNSName" ]
+      TTL: 60
+      Type: "CNAME"
+  ZipkinAddressParameterStore:
+    Type: "AWS::SSM::Parameter"
+    Properties:
+      Name: !Join ["/",["",!Ref StudentId,"prod","zipkin","address"]]
+      Description: "Shortener service ID"
+      Type: String
+      Value: !Join ["",["http://",!Ref ZipkinLoadBalancerDns,"/api/v2/spans"]]
 
 Outputs:
   WebServerSecurityGroup:

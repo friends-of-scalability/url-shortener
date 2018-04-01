@@ -37,6 +37,8 @@ function get_environmental_variables() {
     export URLSHORTENER_HTTP_ADDR=$(get_parameter_store "/"$STUDENT"/prod/http/addr" $EC2_REGION)
     export URLSHORTENER_SD_RESOLVER=$(get_parameter_store "/"$STUDENT"/prod/sd/resolver" $EC2_REGION)
     export URLSHORTENER_SD_SHORTENER=$(get_parameter_store "/"$STUDENT"/prod/sd/shortener" $EC2_REGION)
+    export URLSHORTENER_ZIPKIN_ADDRESS=$(get_parameter_store "/"$STUDENT"/prod/zipkin/address" $EC2_REGION)
+
 }
 
 get_dependencies

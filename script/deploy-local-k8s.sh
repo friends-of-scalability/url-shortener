@@ -25,16 +25,22 @@ function get_helm() {
 }
 
 function package_and_deploy() {
+    set +e
     ${KUBECTL_PATH} get deployment tiller-deploy --namespace kube-system &> /dev/null
     if [[ $? -ne 0 ]];then
         ${HELM_PATH} init --upgrade
         sleep 15
     fi
+    set -e
     find ${CHARTS_PATH} -name "*.tgz" -delete
     ${HELM_PATH} package -u ${CHARTS_PATH}/url-shortener -d ${CHARTS_PATH}
     ${HELM_PATH} upgrade -i ${RELEASE_NAME} $(find ${CHARTS_PATH} -maxdepth 1 -name "*.tgz")
+}
+function deploy_prometheus_and_grafana() {
+    ${KUBECTL_PATH} apply --filename https://raw.githubusercontent.com/giantswarm/kubernetes-prometheus/master/manifests-all.yaml
 }
 
 get_kubectl
 get_helm
 package_and_deploy
+deploy_prometheus_and_grafana

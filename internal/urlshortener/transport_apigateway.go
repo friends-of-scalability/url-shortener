@@ -13,12 +13,16 @@ import (
 	"github.com/friends-of-scalability/url-shortener/cmd/config"
 	endpoint "github.com/go-kit/kit/endpoint"
 	sd "github.com/go-kit/kit/sd"
+	zipkin "github.com/openzipkin/zipkin-go"
+
+	stdprometheus "github.com/prometheus/client_golang/prometheus"
 
 	"github.com/gorilla/mux"
 
 	kitlog "github.com/go-kit/kit/log"
 	dnssrv "github.com/go-kit/kit/sd/dnssrv"
 	"github.com/go-kit/kit/sd/lb"
+	kittracing "github.com/go-kit/kit/tracing/zipkin"
 	kithttp "github.com/go-kit/kit/transport/http"
 )
 
@@ -30,9 +34,8 @@ func getCurrentAddr(r *http.Request) string {
 	return scheme + "://" + r.Host + "/"
 }
 
-func MakeAPIGWHandler(ctx context.Context, us Service, logger kitlog.Logger, cfg *config.Config) http.Handler {
+func MakeAPIGWHandler(ctx context.Context, us Service, logger kitlog.Logger, cfg *config.Config, tracer *zipkin.Tracer) http.Handler {
 	r := mux.NewRouter()
-
 	opts := []kithttp.ServerOption{
 		kithttp.ServerErrorLogger(logger),
 		kithttp.ServerErrorEncoder(encodeError),
@@ -44,6 +47,7 @@ func MakeAPIGWHandler(ctx context.Context, us Service, logger kitlog.Logger, cfg
 			c = context.WithValue(c, contextKeyHTTPAddress, scheme+"://"+r.Host+"/")
 			return c
 		}),
+		kittracing.HTTPServerTrace(tracer),
 	}
 
 	URLHealthzHandler := kithttp.NewServer(
@@ -54,43 +58,46 @@ func MakeAPIGWHandler(ctx context.Context, us Service, logger kitlog.Logger, cfg
 		encodeResponse,
 		opts...,
 	)
+	r.Path("/metrics").Handler(stdprometheus.Handler())
 	r.Handle("/healthz", URLHealthzHandler).Methods("GET")
 	hystrix.ConfigureCommand("shortener Request", hystrix.CommandConfig{Timeout: 100000})
 	hystrix.ConfigureCommand("resolver Request", hystrix.CommandConfig{Timeout: 1000})
 	hystrix.ConfigureCommand("info Request", hystrix.CommandConfig{Timeout: 1000})
 
-	var retry endpoint.Endpoint
-	instancer := dnssrv.NewInstancer(cfg.ServiceDiscovery.Resolver, 200*time.Millisecond, kitlog.NewNopLogger())
-	factory := endpointFactory(ctx, "resolver", "GET", logger, cfg)
-	endpointer := sd.NewEndpointer(instancer, factory, logger)
-	balancer := lb.NewRoundRobin(endpointer)
-	retry = lb.Retry(3, 500*time.Millisecond, balancer)
 	resolverEndpoint := Hystrix("resolver Request",
-		"Resolver service currently unavailable", logger)(retry)
+		"Resolver service currently unavailable", logger)(newEndpoint(ctx, "resolver", "GET", logger, cfg, tracer))
 	r.Handle("/{shortURL}", kithttp.NewServer(resolverEndpoint, decodeURLRedirectRequest, encodeRedirectResponse, opts...)).Methods("GET")
 
-	instancer = dnssrv.NewInstancer(cfg.ServiceDiscovery.Resolver, 200*time.Millisecond, kitlog.NewNopLogger())
-	factory = endpointFactory(ctx, "info", "GET", logger, cfg)
-	endpointer = sd.NewEndpointer(instancer, factory, logger)
-	balancer = lb.NewRoundRobin(endpointer)
-	retry = lb.Retry(3, 500*time.Millisecond, balancer)
 	infoEndpoint := Hystrix("info Request",
-		"Info service currently unavailable", logger)(retry)
+		"Info service currently unavailable", logger)(newEndpoint(ctx, "info", "GET", logger, cfg, tracer))
 	r.Handle("/info/{shortURL}", kithttp.NewServer(infoEndpoint, decodeURLInfoRequest, encodeResponse, opts...)).Methods("GET")
 
-	instancer = dnssrv.NewInstancer(cfg.ServiceDiscovery.Shortener, 200*time.Millisecond, kitlog.NewNopLogger())
-	factory = endpointFactory(ctx, "shortener", "POST", logger, cfg)
-	endpointer = sd.NewEndpointer(instancer, factory, logger)
-	balancer = lb.NewRoundRobin(endpointer)
-	retry = lb.Retry(3, 500*time.Millisecond, balancer)
 	shortenerEndpoint := Hystrix("shortener Request",
-		"Shortener service currently unavailable", logger)(retry)
+		"Shortener service currently unavailable", logger)(newEndpoint(ctx, "shortener", "POST", logger, cfg, tracer))
 	r.Handle("/", kithttp.NewServer(shortenerEndpoint, decodeURLShortenerRequest, encodeResponse, opts...)).Methods("POST")
 
 	return r
 }
 
-func endpointFactory(ctx context.Context, action, method string, logger kitlog.Logger, cfg *config.Config) sd.Factory {
+func newEndpoint(ctx context.Context, action, method string, logger kitlog.Logger, cfg *config.Config, tracer *zipkin.Tracer) endpoint.Endpoint {
+	var instancer *dnssrv.Instancer
+	switch action {
+	case "resolver":
+		instancer = dnssrv.NewInstancer(cfg.ServiceDiscovery.Resolver, 200*time.Millisecond, kitlog.NewNopLogger())
+	case "info":
+		instancer = dnssrv.NewInstancer(cfg.ServiceDiscovery.Resolver, 200*time.Millisecond, kitlog.NewNopLogger())
+	case "shortener":
+		instancer = dnssrv.NewInstancer(cfg.ServiceDiscovery.Shortener, 200*time.Millisecond, kitlog.NewNopLogger())
+
+	}
+	factory := endpointFactory(ctx, action, method, logger, cfg, tracer)
+	endpointer := sd.NewEndpointer(instancer, factory, logger)
+	balancer := lb.NewRoundRobin(endpointer)
+	retry := lb.Retry(3, 500*time.Millisecond, balancer)
+	return retry
+}
+
+func endpointFactory(ctx context.Context, action, method string, logger kitlog.Logger, cfg *config.Config, tracer *zipkin.Tracer) sd.Factory {
 	return func(instance string) (endpoint.Endpoint, io.Closer, error) {
 		s := strings.Split(instance, ":")
 		// removing port since service discovery is getting a wrong one
@@ -127,7 +134,12 @@ func endpointFactory(ctx context.Context, action, method string, logger kitlog.L
 			return ctx
 		})
 
-		return kithttp.NewClient(method, tgt, enc, dec, before).Endpoint(), nil, nil
+		// global client middlewares
+		options := []kithttp.ClientOption{
+			kittracing.HTTPClientTrace(tracer),
+			before,
+		}
+		return kithttp.NewClient(method, tgt, enc, dec, options...).Endpoint(), nil, nil
 	}
 }
 

@@ -53,7 +53,7 @@ type healthzResponse struct {
 func makeURLShortifyEndpoint(s Service) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		req := request.(shortenerRequest)
-		m, err := s.Shortify(req.URL)
+		m, err := s.Shortify(ctx, req.URL)
 		if err != nil {
 			return shortenerResponse{Err: err.Error()}, nil
 		}
@@ -81,7 +81,7 @@ func makeURLHealthzEndpoint(s Service) endpoint.Endpoint {
 func makeURLRedirectEndpoint(s Service) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		req := request.(redirectRequest)
-		m, err := s.Resolve(req.id)
+		m, err := s.Resolve(ctx, req.id)
 		if err != nil {
 			return redirectResponse{Err: err.Error()}, nil
 		}
@@ -98,7 +98,7 @@ func makeURLRedirectEndpoint(s Service) endpoint.Endpoint {
 func makeURLInfoEndpoint(s Service) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		req := request.(infoRequest)
-		m, err := s.GetInfo(req.id)
+		m, err := s.GetInfo(ctx, req.id)
 		if err != nil {
 			return infoResponse{Err: err.Error()}, nil
 		}

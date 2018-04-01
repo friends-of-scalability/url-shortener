@@ -9,10 +9,17 @@ import (
 	"strings"
 	"syscall"
 
+	stdlog "log"
+
 	"github.com/afex/hystrix-go/hystrix"
 	"github.com/friends-of-scalability/url-shortener/cmd/config"
 	"github.com/friends-of-scalability/url-shortener/internal/urlshortener"
 	"github.com/go-kit/kit/log"
+	kitprometheus "github.com/go-kit/kit/metrics/prometheus"
+	zipkin "github.com/openzipkin/zipkin-go"
+	httpreporter "github.com/openzipkin/zipkin-go/reporter/http"
+
+	stdprometheus "github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -32,6 +39,8 @@ func bindEnvironmentVariables() {
 	viper.BindEnv("role")
 	viper.BindEnv("sd.resolver")
 	viper.BindEnv("sd.shortener")
+	viper.BindEnv("zipkin.address")
+
 }
 
 func bindFlags(rootCmd *cobra.Command, c *config.Config) error {
@@ -45,6 +54,7 @@ func bindFlags(rootCmd *cobra.Command, c *config.Config) error {
 	rootCmd.PersistentFlags().StringVar(&c.ServiceDiscovery.Resolver, "sd.resolver", "", "DNS SRV for resolvers")
 	rootCmd.PersistentFlags().StringVar(&c.ServiceDiscovery.Shortener, "sd.shortener", "", "DNS SRV for shorteners")
 	rootCmd.PersistentFlags().StringVar(&c.Role, "role", "full", "which role will do this instance full|apigateway|resolver|shortener")
+	rootCmd.PersistentFlags().StringVar(&c.Zipkin.Address, "zipkin.address", "http://localhost:9411/api/v2/spans", "Zipkin HTTP address")
 
 	if err := viper.BindPFlags(rootCmd.PersistentFlags()); err != nil {
 		return err
@@ -74,6 +84,7 @@ func initializeConfig(c *config.Config) {
 	c.Postgresql.Password = viper.GetString("postgresql.password")
 	c.ServiceDiscovery.Resolver = viper.GetString("sd.resolver")
 	c.ServiceDiscovery.Shortener = viper.GetString("sd.shortener")
+	c.Zipkin.Address = viper.GetString("zipkin.address")
 }
 
 func createCLI(c *config.Config) error {
@@ -117,6 +128,39 @@ func main() {
 		ctx = context.Background()
 	}
 
+	fieldKeys := []string{"method"}
+	requestCount := kitprometheus.NewCounterFrom(stdprometheus.CounterOpts{
+		Namespace: "scalability",
+		Subsystem: "url_shortener",
+		Name:      "request_count",
+		Help:      "Number of requests received.",
+	}, fieldKeys)
+	requestLatency := kitprometheus.NewSummaryFrom(stdprometheus.SummaryOpts{
+		Namespace: "scalability",
+		Subsystem: "url_shortener",
+		Name:      "request_latency_microseconds",
+		Help:      "Total duration of requests in microseconds.",
+	}, fieldKeys)
+
+	var (
+		serviceName     = "urlshortener." + cfg.Role
+		serviceHostPort = "localhost:8000"
+	)
+
+	// create an instance of the HTTP Reporter.
+	reporter := httpreporter.NewReporter(cfg.Zipkin.Address)
+
+	// create our tracer's local endpoint (how the service is identified in Zipkin).
+	localEndpoint, err := zipkin.NewEndpoint(serviceName, serviceHostPort)
+	if err != nil {
+		stdlog.Fatal(err)
+	}
+	// create our tracer instance.
+	tracer, err := zipkin.NewTracer(reporter, zipkin.WithLocalEndpoint(localEndpoint))
+	if err != nil {
+		stdlog.Fatal(err)
+	}
+
 	var s urlshortener.Service
 	{
 		var err error
@@ -126,19 +170,21 @@ func main() {
 			os.Exit(1)
 		}
 		s = urlshortener.NewLoggingService(logger, s)
+		s = urlshortener.NewMetricsService(requestCount, requestLatency, s)
+		s = urlshortener.NewTracingService(tracer, s)
 	}
 
 	var h http.Handler
 	{
 		switch cfg.Role {
 		case "full":
-			h = urlshortener.MakeHandler(ctx, s, log.With(logger, "component", "HTTP"))
+			h = urlshortener.MakeHandler(ctx, s, log.With(logger, "component", "HTTP"), tracer)
 		case "resolver":
-			h = urlshortener.MakeResolverHandler(ctx, s, log.With(logger, "component", "HTTP"))
+			h = urlshortener.MakeResolverHandler(ctx, s, log.With(logger, "component", "HTTP"), tracer)
 		case "shortener":
-			h = urlshortener.MakeShortenerHandler(ctx, s, log.With(logger, "component", "HTTP"))
+			h = urlshortener.MakeShortenerHandler(ctx, s, log.With(logger, "component", "HTTP"), tracer)
 		case "apigateway":
-			h = urlshortener.MakeAPIGWHandler(ctx, s, log.With(logger, "component", "HTTP"), &cfg)
+			h = urlshortener.MakeAPIGWHandler(ctx, s, log.With(logger, "component", "HTTP"), &cfg, tracer)
 		}
 	}
 

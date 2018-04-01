@@ -1,6 +1,7 @@
 package urlshortener
 
 import (
+	"context"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -17,23 +18,23 @@ func NewLoggingService(logger log.Logger, s Service) Service {
 }
 
 // Login to the system.
-func (s *loggingService) Shortify(longURL string) (mapping *shortURL, err error) {
+func (s *loggingService) Shortify(ctx context.Context, longURL string) (mapping *shortURL, err error) {
 	defer func(begin time.Time) {
 		s.logger.Log("method", "shortify", "url", longURL, "took", time.Since(begin), "err", err)
 	}(time.Now())
-	return s.Service.Shortify(longURL)
+	return s.Service.Shortify(ctx, longURL)
 }
 
-func (s *loggingService) Resolve(shortURL string) (mapping *shortURL, err error) {
+func (s *loggingService) Resolve(ctx context.Context, shortURL string) (mapping *shortURL, err error) {
 	defer func(begin time.Time) {
 		s.logger.Log("method", "Resolve", "shortURLId", shortURL, "took", time.Since(begin), "err", err)
 	}(time.Now())
-	return s.Service.Resolve(shortURL)
+	return s.Service.Resolve(ctx, shortURL)
 }
 
-func (s *loggingService) GetInfo(shortURL string) (mapping *shortURL, err error) {
+func (s *loggingService) GetInfo(ctx context.Context, shortURL string) (mapping *shortURL, err error) {
 	defer func(begin time.Time) {
 		s.logger.Log("method", "GetInfo", "shortURLId", shortURL, "took", time.Since(begin), "err", err)
 	}(time.Now())
-	return s.Service.GetInfo(shortURL)
+	return s.Service.GetInfo(ctx, shortURL)
 }

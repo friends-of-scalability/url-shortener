@@ -5,18 +5,22 @@ import (
 	"net/http"
 
 	"github.com/afex/hystrix-go/hystrix"
+	zipkin "github.com/openzipkin/zipkin-go"
 
 	"github.com/gorilla/mux"
 
 	kitlog "github.com/go-kit/kit/log"
+	kittracing "github.com/go-kit/kit/tracing/zipkin"
 	kithttp "github.com/go-kit/kit/transport/http"
+	stdprometheus "github.com/prometheus/client_golang/prometheus"
 )
 
 // MakeHandler returns a handler for the urlshortener service.
-func MakeHandler(ctx context.Context, us Service, logger kitlog.Logger) http.Handler {
+func MakeHandler(ctx context.Context, us Service, logger kitlog.Logger, tracer *zipkin.Tracer) http.Handler {
 	r := mux.NewRouter()
 
 	opts := []kithttp.ServerOption{
+
 		kithttp.ServerErrorLogger(logger),
 		kithttp.ServerErrorEncoder(encodeError),
 		kithttp.ServerBefore(kithttp.PopulateRequestContext, func(c context.Context, r *http.Request) context.Context {
@@ -27,6 +31,7 @@ func MakeHandler(ctx context.Context, us Service, logger kitlog.Logger) http.Han
 			c = context.WithValue(c, contextKeyHTTPAddress, scheme+"://"+r.Host+"/")
 			return c
 		}),
+		kittracing.HTTPServerTrace(tracer),
 	}
 
 	URLHealthzHandler := kithttp.NewServer(
@@ -67,7 +72,7 @@ func MakeHandler(ctx context.Context, us Service, logger kitlog.Logger) http.Han
 		encodeResponse,
 		opts...,
 	)
-
+	r.Path("/metrics").Handler(stdprometheus.Handler())
 	r.Handle("/", URLShortifyHandler).Methods("POST")
 	r.Handle("/healthz", URLHealthzHandler).Methods("GET")
 	r.Handle("/{shortURL}", URLRedirectHandler).Methods("GET")

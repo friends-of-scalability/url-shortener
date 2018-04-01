@@ -5,12 +5,15 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
+	zipkin "github.com/openzipkin/zipkin-go"
+	stdprometheus "github.com/prometheus/client_golang/prometheus"
 
 	kitlog "github.com/go-kit/kit/log"
+	kittracing "github.com/go-kit/kit/tracing/zipkin"
 	kithttp "github.com/go-kit/kit/transport/http"
 )
 
-func MakeResolverHandler(ctx context.Context, us Service, logger kitlog.Logger) http.Handler {
+func MakeResolverHandler(ctx context.Context, us Service, logger kitlog.Logger, tracer *zipkin.Tracer) http.Handler {
 	r := mux.NewRouter()
 
 	opts := []kithttp.ServerOption{
@@ -25,6 +28,7 @@ func MakeResolverHandler(ctx context.Context, us Service, logger kitlog.Logger) 
 			c = context.WithValue(c, contextKeyHTTPAddress, scheme+"://"+r.Host+"/")
 			return c
 		}),
+		kittracing.HTTPServerTrace(tracer),
 	}
 
 	URLHealthzHandler := kithttp.NewServer(
@@ -47,7 +51,7 @@ func MakeResolverHandler(ctx context.Context, us Service, logger kitlog.Logger) 
 		encodeResponse,
 		opts...,
 	)
-
+	r.Path("/metrics").Handler(stdprometheus.Handler())
 	r.Handle("/healthz", URLHealthzHandler).Methods("GET")
 	r.Handle("/{shortURL}", URLRedirectHandler).Methods("GET")
 	r.Handle("/info/{shortURL}", URLInfoHandler).Methods("GET")

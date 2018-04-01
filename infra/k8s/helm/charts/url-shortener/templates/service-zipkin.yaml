@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: "{{ template "url-shortener.fullname" . }}-zipkin"
+  labels:
+    app: {{ template "url-shortener.name" . }}
+    chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  type: NodePort
+  ports:
+    - targetPort: 9411
+      port: 9411
+      nodePort: 31900
+      protocol: TCP
+      name: url-shortener-zipkin
+  selector:
+    app: "{{ template "url-shortener.name" . }}-zipkin"
+    release: {{ .Release.Name }}

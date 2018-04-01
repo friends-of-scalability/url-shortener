@@ -1,6 +1,7 @@
 package urlshortener
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -82,7 +83,7 @@ func NewService(cfg *config.Config) (Service, error) {
 }
 
 // Login to the system.
-func (s *shortURLService) Shortify(URL string) (mapping *shortURL, err error) {
+func (s *shortURLService) Shortify(ctx context.Context, URL string) (mapping *shortURL, err error) {
 
 	if !valid.IsURL(URL) {
 		return nil, errMalformedURL
@@ -100,7 +101,7 @@ func (s *shortURLService) Shortify(URL string) (mapping *shortURL, err error) {
 	return item, nil
 }
 
-func (s *shortURLService) GetInfo(shortURL string) (mapping *shortURL, err error) {
+func (s *shortURLService) GetInfo(ctx context.Context, shortURL string) (mapping *shortURL, err error) {
 	URL, err := s.urlDatabase.ByID(shortURL)
 	if err != nil {
 		return nil, err
@@ -108,8 +109,8 @@ func (s *shortURLService) GetInfo(shortURL string) (mapping *shortURL, err error
 	return URL, nil
 }
 
-func (s *shortURLService) Resolve(shortURL string) (mapping *shortURL, err error) {
-	URL, err := s.GetInfo(shortURL)
+func (s *shortURLService) Resolve(ctx context.Context, shortURL string) (mapping *shortURL, err error) {
+	URL, err := s.GetInfo(ctx, shortURL)
 	if err != nil {
 		return nil, err
 	}

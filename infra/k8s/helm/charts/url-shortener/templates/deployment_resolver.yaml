@@ -9,10 +9,15 @@ metadata:
     heritage: {{ .Release.Service }}
   annotations:
     checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    prometheus.io/scrape: "true"
+    prometheus.io/port: {{ .Values.service.resolver.internalPort | quote }}
 spec:
   replicas: {{ .Values.replicaCount }}
   template:
     metadata:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: {{ .Values.service.resolver.internalPort | quote }}
       labels:
         app: "{{ template "url-shortener.name" . }}-resolver"
         release: {{ .Release.Name }}

@@ -7,6 +7,7 @@ type Config struct {
 	EnableFakeLoad   bool
 	Postgresql       PostgresqlConfig
 	ServiceDiscovery ServiceDiscoveryConfig
+	Zipkin           ZipkinConfig
 	Role             string
 	StorageType      string
 }
@@ -21,4 +22,8 @@ type PostgresqlConfig struct {
 type ServiceDiscoveryConfig struct {
 	Resolver  string
 	Shortener string
+}
+
+type ZipkinConfig struct {
+	Address string
 }

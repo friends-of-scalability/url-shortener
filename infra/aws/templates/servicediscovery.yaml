@@ -40,7 +40,6 @@ Resources:
       Description: "Resolver service ID"
       Type: String
       Value: !Join ["",["resolver.",!Ref Name,".aws"]]
-
   ShortenerService:
     Type: "AWS::ServiceDiscovery::Service"
     Properties:

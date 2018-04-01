@@ -16,3 +16,4 @@ data:
   URLSHORTENER_FAKELOAD: 'true'
   URLSHORTENER_SD_RESOLVER: {{ template "url-shortener.fullname" . }}-resolver.{{ .Release.Namespace }}.svc.cluster.local
   URLSHORTENER_SD_SHORTENER: {{ template "url-shortener.fullname" . }}-shortener.{{ .Release.Namespace }}.svc.cluster.local
+  URLSHORTENER_ZIPKIN_ADDRESS: "http://{{ template "url-shortener.fullname" . }}-zipkin.{{ .Release.Namespace }}.svc.cluster.local:9411/api/v2/spans"
