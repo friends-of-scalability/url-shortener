@@ -3,5 +3,7 @@ services:
   dev:
     build: .
     volumes:
-      - ../:/go/src/github.com/friends-of-scalability/url-shortener/
+      - ../../../:/go/src/github.com/friends-of-scalability/url-shortener/
     working_dir: /go/src/github.com/friends-of-scalability/url-shortener
+    environment:
+      - PACKAGE_NAME_PREFIX

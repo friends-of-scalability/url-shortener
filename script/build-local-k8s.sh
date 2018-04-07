@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -x
 MINIKUBE_BIN_DIRECTORY="$PWD/script/bin"
 MINIKUBE_PATH="${MINIKUBE_BIN_DIRECTORY}/minikube"
 
@@ -14,9 +15,10 @@ function check_or_start_cluster() {
         echo "minikube is already up and running"
     elif [ $? -eq 1 ];then
         echo "minikube is not running, starting up the cluster"
-        $MINIKUBE_PATH start --kubernetes-version v1.9.0
+        $MINIKUBE_PATH start --kubernetes-version v1.8.0 --memory 8196 --cpus 4
         $MINIKUBE_PATH addons enable ingress
         $MINIKUBE_PATH addons enable registry
+        $MINIKUBE_PATH addons enable heapster
     elif [ $? -eq 4 ];then
         echo "something went wrong in the cluster, check up logs"
     elif [ $? -eq 7 ];then

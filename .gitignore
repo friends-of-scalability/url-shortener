@@ -17,5 +17,5 @@ bin/
 
 # Artifacts
 *.deb
-helm/charts/*.tgz
+infra/k8s/helm/charts/*.tgz
 script/bin/*

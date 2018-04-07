@@ -1,0 +1,20 @@
+template_path: templates/vpc.yaml
+parameters:
+  PrivateElbSubnetRange0: 10.15.32.0/22
+  PrivateElbSubnetRange1: 10.15.36.0/22
+  PrivateElbSubnetRange2: 10.15.40.0/22
+  PrivateElbSubnetRange3: 10.15.44.0/22
+  PrivateSubnetRange0: 10.15.16.0/22
+  PrivateSubnetRange1: 10.15.20.0/22
+  PrivateSubnetRange2: 10.15.24.0/22
+  PrivateSubnetRange3: 10.15.28.0/22
+  PublicElbSubnetRange0: 10.15.8.0/23
+  PublicElbSubnetRange1: 10.15.10.0/23
+  PublicElbSubnetRange2: 10.15.12.0/23
+  PublicElbSubnetRange3: 10.15.14.0/23
+  PublicSubnetRange0: 10.15.0.0/23
+  PublicSubnetRange1: 10.15.2.0/23
+  PublicSubnetRange2: 10.15.4.0/23
+  PublicSubnetRange3: 10.15.6.0/23
+  VpcNetworkRange: 10.15.0.0/16
+  VpcName: {{ var.VpcName }}

@@ -19,7 +19,7 @@ default: quick
 
 lazy: version fmt lint vet test
 
-quick: version fmt lint vet buildonly
+quick: version fmt lint vet docker-build
 
 vendor:
 	@dep ensure
@@ -30,12 +30,13 @@ version:
 	@echo "\trevision:\t" ${REV}
 	@echo "\tversion:\t" ${VERSION}
 
-ci: tools buildonly generate-package
+ci: buildonly generate-package
 	@echo "CI BUILD..."
 
 generate-package:
 	@echo "GENERATE PACKAGE..."
-	bash script/build-package.sh
+	bash script/build-package.sh full
+
 
 tools:
 	@echo "GO TOOLS installation..."
@@ -43,14 +44,14 @@ tools:
 	@go get -u github.com/golang/lint/golint
 	@curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
 
-build: version test
+build: version vendor test
 	@echo "GO BUILD..."
 	@CGO_ENABLED=0 go build -ldflags "-s -X main.Build=${VERSION} -X main.Revision=${REV} -X main.Branch=${BRANCH} -X main.OSArch=${XC_OS}/${XC_ARCH}" -v -o ./bin/${APPNAME} ${MAIN_PATH}
 
-buildonly:
+buildonly: vendor
 	@CGO_ENABLED=0 go build -ldflags "-s -X main.Build=${VERSION} -X main.Revision=${REV} -X main.Branch=${BRANCH} -X main.OSArch=${XC_OS}/${XC_ARCH}" -v -o ./bin/${APPNAME} ${MAIN_PATH}
 
-crosscompile:
+crosscompile: vendor
 	@./script/docker-build.sh linux-build
 	@./script/docker-build.sh darwin-build
 	@./script/docker-build.sh freebsd-build
@@ -66,8 +67,8 @@ docker:
 		echo "Please run crosscompile before running docker command." ; \
 		exit 1 ; \
 	fi
-	@eval $$(${SCRIPT_PATH}/bin/minikube docker-env ); \
-		docker build -t ${DOCKER_REPO}:${VERSION} -q --build-arg CONT_IMG_VER=${VERSION} --build-arg BINARY=bin/linux-amd64/${APPNAME} . ; \
+	eval $$(${SCRIPT_PATH}/bin/minikube docker-env ); \
+		docker build -t ${DOCKER_REPO}:${VERSION} -q --build-arg CONT_IMG_VER=${VERSION} . ; \
 		docker tag ${DOCKER_REPO}:${VERSION} ${DOCKER_REPO}:latest; \
 		eval $$(${SCRIPT_PATH}/bin/minikube docker-env -u )
 
@@ -86,7 +87,7 @@ deploy-in-k8s:
 	@echo "deploying in k8s"
 	@./script/deploy-local-k8s.sh
 
-run-k8s: build-in-k8s deploy-in-k8s
+run-k8s: docker-clean build-in-k8s deploy-in-k8s
 
 tar-everything:
 	@echo "tar-everything..."
@@ -110,11 +111,11 @@ gpg-verify:
 	@gpg --verify bin/${APPNAME}-${VERSION}.sig bin/${APPNAME}-${VERSION}.shasums
 
 
-docker-build:
+docker-build: vendor
 	@echo "linux build... amd64"
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-s -X main.Build=${VERSION} -X main.Revision=${REV} -X main.Branch=${BRANCH} -X main.OSArch=linux/amd64" -v -o ./bin/linux-amd64/${APPNAME} ${MAIN_PATH} 2>/dev/null
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-s -X main.Build=${VERSION} -X main.Revision=${REV} -X main.Branch=${BRANCH} -X main.OSArch=linux/amd64" -v -o ./bin/linux-amd64/${APPNAME} ${MAIN_PATH}
 
-linux-build:
+linux-build: vendor
 	@echo "linux build... 386"
 	CGO_ENABLED=0 GOOS=linux GOARCH=386 go build -ldflags "-s -X main.Build=${VERSION} -X main.Revision=${REV} -X main.Branch=${BRANCH} -X main.OSArch=linux/386" -v -o ./bin/linux-386/${APPNAME} ${MAIN_PATH} 2>/dev/null
 	@echo "linux build... amd64"
@@ -122,19 +123,19 @@ linux-build:
 	@echo "linux build... arm"
 	CGO_ENABLED=0 GOOS=linux GOARCH=arm go build -ldflags "-s -X main.Build=${VERSION} -X main.Revision=${REV} -X main.Branch=${BRANCH} -X main.OSArch=linux/arm" -v -o ./bin/linux-arm/${APPNAME} ${MAIN_PATH} 2>/dev/null
 
-darwin-build:
+darwin-build: vendor
 	@echo "darwin build... 386"
 	CGO_ENABLED=0 GOOS=darwin GOARCH=386 go build -ldflags "-s -X main.Build=${VERSION} -X main.Revision=${REV} -X main.Branch=${BRANCH} -X main.OSArch=darwin/386" -v -o ./bin/darwin-386/${APPNAME} ${MAIN_PATH} 2>/dev/null
 	@echo "darwin build... amd64"
 	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags "-s -X main.Build=${VERSION} -X main.Revision=${REV} -X main.Branch=${BRANCH} -X main.OSArch=darwin/amd64" -v -o ./bin/darwin-amd64/${APPNAME} ${MAIN_PATH} 2>/dev/null
 
-freebsd-build:
+freebsd-build: vendor
 	@echo "freebsd build... 386"
 	CGO_ENABLED=0 GOOS=freebsd GOARCH=386 go build -ldflags "-s -X main.Build=${VERSION} -X main.Revision=${REV} -X main.Branch=${BRANCH} -X main.OSArch=freebsd/386" -v -o ./bin/freebsd-386/${APPNAME} ${MAIN_PATH} 2>/dev/null
 	@echo "freebsd build... amd64"
 	CGO_ENABLED=0 GOOS=freebsd GOARCH=amd64 go build -ldflags "-s -X main.Build=${VERSION} -X main.Revision=${REV} -X main.Branch=${BRANCH} -X main.OSArch=freebsd/amd64" -v -o ./bin/freebsd-amd64/${APPNAME} ${MAIN_PATH} 2>/dev/null
 
-windows-build:
+windows-build: vendor
 	@echo "windows build... 386"
 	CGO_ENABLED=0 GOOS=windows GOARCH=386 go build -ldflags "-s -X main.Build=${VERSION} -X main.Revision=${REV} -X main.Branch=${BRANCH} -X main.OSArch=windows/386" -v -o ./bin/windows-386/${APPNAME}.exe ${MAIN_PATH} 2>/dev/null
 	@echo "windows build... amd64"
@@ -163,6 +164,8 @@ generate:
 	@echo "GO GENERATE..."
 	@go generate $$(go list ./... | grep -v /vendor/)
 
+
+
 # vet runs the Go source code static analysis tool `vet` to find
 # any common errors.
 vet:
@@ -178,9 +181,21 @@ fmt:
 	@echo "GO FMT..."
 	@gofmt -w -s $(GOFMT_FILES)
 
-clean:
-	rm -rf bin/
+
+docker-clean:
+	@echo "cleaning docker files"
+	@eval $$(${SCRIPT_PATH}/bin/minikube docker-env ); \
+		docker rmi -f ${DOCKER_REPO}:${VERSION} ${DOCKER_REPO}:latest; \
+		eval $$(${SCRIPT_PATH}/bin/minikube docker-env -u )
+
+destroy:
+	@$(MAKE) clean
 	${SCRIPT_PATH}/bin/minikube stop
 	${SCRIPT_PATH}/bin/minikube delete
 
-.PHONY: tools default docker buildonly clean
+clean:
+	@echo "cleaning files"
+	rm -rf bin/
+	@$(MAKE) docker-clean
+
+.PHONY: tools default docker buildonly clean docker-clean destroy
