@@ -1,1 +1,3 @@
 # url-shortener
+
+`make crosscompile`

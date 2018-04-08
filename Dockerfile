@@ -1,6 +1,6 @@
-ARG BINARY
 ARG CONT_IMG_VER
 FROM alpine:3.5
+ADD bin/linux-amd64/urlshortener /bin/
 # Stress Version can be found on offcial website of stress
 # https://people.seas.harvard.edu/~apw/stress/
 ENV STRESS_VERSION=1.0.4 \
@@ -15,7 +15,7 @@ RUN \
   apk del g++ make curl && \
   rm -rf /tmp/* /var/tmp/* /var/cache/apk/* /var/cache/distfiles/*
 RUN apk add --update --no-cache ca-certificates
+RUN apk add bind-tools curl tcpdump
 EXPOSE 8080
-ADD $BINARY /
 ENTRYPOINT [ "/bin/urlshortener" ]
 CMD [""]
