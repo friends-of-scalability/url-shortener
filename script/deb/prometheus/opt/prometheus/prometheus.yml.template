@@ -18,7 +18,7 @@ scrape_configs:
   - job_name: 'urlshortener-apigateway'
     scrape_interval: 5s
     static_configs:
-      - targets: ['fabian.alumni.friendsofscalability.com']
+      - targets: ['%student_id%.alumni.friendsofscalability.com']
         labels:
           group: 'urlshortener'
           component: 'apigateway'
@@ -27,8 +27,8 @@ scrape_configs:
     scrape_interval: 5s
     dns_sd_configs:
     - names:
-      - 'resolver.fabian.aws'
-      - 'shortener.fabian.aws'
+      - 'resolver.%student_id%.aws'
+      - 'shortener.%student_id%.aws'
 
     relabel_configs:
     - source_labels: ['__meta_dns_name']
