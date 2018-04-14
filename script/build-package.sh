@@ -37,6 +37,10 @@ fpm \
   --iteration=$(git rev-parse --short HEAD) \
   --description "${DESCRIPTION}" \
   -d "stress" \
+  -d "python2.7" \
+  -d "curl" \
+  -d "jq" \
+  -d "python-pip" \
   --after-install ${PKG_BUILD_DIR}/usr/local/bin/after_install.sh \
   -C ${PKG_BUILD_DIR}
 popd

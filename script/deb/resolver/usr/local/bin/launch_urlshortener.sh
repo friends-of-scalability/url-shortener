@@ -6,15 +6,6 @@ function unset_if_null_or_empty() {
     fi
 }
 
-function get_dependencies() {
-    # Install the AWS CLI
-    apt-get -y install python2.7 curl jq
-    curl -o /tmp/get-pip.py https://bootstrap.pypa.io/get-pip.py
-    python2.7 /tmp/get-pip.py
-    pip install awscli
-    # Getting region
-}
-
 function get_parameter_store(){
     local VAR=$1
     local REGION=$2
@@ -38,7 +29,6 @@ function get_environmental_variables() {
     export URLSHORTENER_ZIPKIN_ADDRESS=$(get_parameter_store "/"$STUDENT"/prod/zipkin/address" $EC2_REGION)
 }
 
-get_dependencies
 get_environmental_variables
 unset_if_null_or_empty "URLSHORTENER_HTTP_ADDR"
 unset_if_null_or_empty "URLSHORTENER_STORAGE"
